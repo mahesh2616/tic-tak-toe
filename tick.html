@@ -1,0 +1,384 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic Tac Toe Game</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: Arial, sans-serif;
+            background: linear-gradient(135deg, #dbeafe, #f3e8ff);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .game {
+            width: 100%;
+            max-width: 420px;
+            background: white;
+            padding: 25px;
+            border-radius: 20px;
+            text-align: center;
+            box-shadow: 0 10px 30px #00000020;
+        }
+
+        h1 {
+            color: #2563eb;
+            margin-bottom: 15px;
+        }
+
+        #status {
+            font-size: 21px;
+            font-weight: bold;
+            color: #15803d;
+            margin: 15px 0 5px;
+            min-height: 28px;
+        }
+
+        #resultEmoji {
+            font-size: 38px;
+            min-height: 50px;
+            margin-bottom: 10px;
+        }
+
+        .board {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .cell {
+            width: 100%;
+            aspect-ratio: 1;
+            border: 2px solid #bfdbfe;
+            border-radius: 12px;
+            background: #eff6ff;
+            font-size: 55px;
+            font-weight: bold;
+            color: #2563eb;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .cell:hover:not(:disabled) {
+            background: #dbeafe;
+            transform: scale(1.03);
+        }
+
+        .cell.o {
+            color: #ef4444;
+        }
+
+        .cell:disabled {
+            cursor: not-allowed;
+        }
+
+        #reset {
+            margin-top: 20px;
+            padding: 13px 25px;
+            background: #2563eb;
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 17px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        #reset:hover {
+            background: #1d4ed8;
+        }
+
+        .info {
+            margin-top: 18px;
+            color: #64748b;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+    </style>
+</head>
+
+<body>
+
+    <div class="game">
+
+        <h1>⭕ Tic Tac Toe ❌</h1>
+
+        <p id="status">Player X's turn</p>
+
+        <div id="resultEmoji"></div>
+
+        <div class="board">
+
+            <button class="cell"></button>
+            <button class="cell"></button>
+            <button class="cell"></button>
+
+            <button class="cell"></button>
+            <button class="cell"></button>
+            <button class="cell"></button>
+
+            <button class="cell"></button>
+            <button class="cell"></button>
+            <button class="cell"></button>
+
+        </div>
+
+        <button id="reset">🔄 Restart Game</button>
+
+        <p class="info">
+            🔊 Every click has a sound!<br>
+            🏆 Winner and Draw have different sounds.
+        </p>
+
+    </div>
+
+    <script>
+        const cells = document.querySelectorAll(".cell");
+
+        const statusText = document.getElementById("status");
+
+        const resultEmoji = document.getElementById("resultEmoji");
+
+        const resetButton = document.getElementById("reset");
+
+        let currentPlayer = "X";
+
+        let gameOver = false;
+
+        let board = ["", "", "", "", "", "", "", "", ""];
+
+        let audioContext;
+
+        // All winning combinations
+        const winningCombinations = [
+            [0, 1, 2],
+            [3, 4, 5],
+            [6, 7, 8],
+            [0, 3, 6],
+            [1, 4, 7],
+            [2, 5, 8],
+            [0, 4, 8],
+            [2, 4, 6]
+        ];
+
+        // Create sound
+        function playTone(frequency, duration, delay = 0) {
+
+            try {
+
+                if (!audioContext) {
+                    audioContext = new (
+                        window.AudioContext ||
+                        window.webkitAudioContext
+                    )();
+                }
+
+                if (audioContext.state === "suspended") {
+                    audioContext.resume();
+                }
+
+                const oscillator = audioContext.createOscillator();
+
+                const gain = audioContext.createGain();
+
+                const startTime = audioContext.currentTime + delay;
+
+                oscillator.type = "sine";
+
+                oscillator.frequency.setValueAtTime(
+                    frequency,
+                    startTime
+                );
+
+                gain.gain.setValueAtTime(0.2, startTime);
+
+                gain.gain.exponentialRampToValueAtTime(
+                    0.001,
+                    startTime + duration
+                );
+
+                oscillator.connect(gain);
+
+                gain.connect(audioContext.destination);
+
+                oscillator.start(startTime);
+
+                oscillator.stop(startTime + duration);
+
+            } catch (error) {
+
+                console.log("Sound error:", error);
+
+            }
+        }
+
+        // Normal click sound
+        function clickSound() {
+
+            playTone(520, 0.12);
+
+        }
+
+        // Winning sound: happy rising notes
+        function winSound() {
+
+            playTone(660, 0.22, 0);
+
+            playTone(880, 0.22, 0.22);
+
+            playTone(1175, 0.45, 0.44);
+
+        }
+
+        // Draw sound: lower descending notes
+        function drawSound() {
+
+            playTone(390, 0.25, 0);
+
+            playTone(310, 0.30, 0.28);
+
+            playTone(230, 0.45, 0.60);
+
+        }
+
+        // Check winner
+        function checkWinner() {
+
+            for (let combination of winningCombinations) {
+
+                const [a, b, c] = combination;
+
+                if (
+                    board[a] !== "" &&
+                    board[a] === board[b] &&
+                    board[b] === board[c]
+                ) {
+
+                    return true;
+
+                }
+
+            }
+
+            return false;
+
+        }
+
+        // When player clicks a box
+        function handleClick(event) {
+
+            const cell = event.currentTarget;
+
+            const index = Array.from(cells).indexOf(cell);
+
+            if (board[index] !== "" || gameOver) {
+                return;
+            }
+
+            board[index] = currentPlayer;
+
+            cell.textContent = currentPlayer;
+
+            cell.disabled = true;
+
+            if (currentPlayer === "O") {
+                cell.classList.add("o");
+            }
+
+            // Play click sound
+            clickSound();
+
+            // If player wins
+            if (checkWinner()) {
+
+                statusText.textContent =
+                    "🎉 Player " + currentPlayer + " Wins!";
+
+                resultEmoji.textContent = "🎉 🏆 🎊";
+
+                gameOver = true;
+
+                cells.forEach(function(button) {
+                    button.disabled = true;
+                });
+
+                winSound();
+
+                return;
+
+            }
+
+            // If match is draw
+            if (!board.includes("")) {
+
+                statusText.textContent = "Match Draw!";
+
+                resultEmoji.textContent = "🤝 😐 🤝";
+
+                gameOver = true;
+
+                drawSound();
+
+                return;
+
+            }
+
+            // Change player
+            currentPlayer =
+                currentPlayer === "X" ? "O" : "X";
+
+            statusText.textContent =
+                "Player " + currentPlayer + "'s turn";
+
+        }
+
+        // Add click event to all boxes
+        cells.forEach(function(cell) {
+
+            cell.addEventListener("click", handleClick);
+
+        });
+
+        // Restart game
+        resetButton.addEventListener("click", function() {
+
+            board = ["", "", "", "", "", "", "", "", ""];
+
+            currentPlayer = "X";
+
+            gameOver = false;
+
+            cells.forEach(function(cell) {
+
+                cell.textContent = "";
+
+                cell.classList.remove("o");
+
+                cell.disabled = false;
+
+            });
+
+            statusText.textContent = "Player X's turn";
+
+            resultEmoji.textContent = "";
+
+            playTone(600, 0.15);
+
+        });
+
+    </script>
+
+</body>
+</html>
